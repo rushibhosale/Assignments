@@ -1,0 +1,71 @@
+pipeline{
+
+    agent {label 'built-in'}
+
+    stages{
+        stage("Checkout code"){
+            steps{
+                echo "Pulling index.html from private GitHub repo..."
+
+                git branch: 'main',
+                    credentialsId: 'ssh-key',
+                    url: 'https://github.com/rushibhosale/priv_repo.git'
+
+            }
+        }
+        stage("Fetch index.html from s3"){
+            steps{
+                
+                sh '''
+                #!/bin/bash
+                BUCKET_NAME="my-jenkins-website-cba1" 
+                REGION="ap-south-1"
+
+                #check if bucket exist or not if not create it
+                if s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
+                    echo "Bucket '$BUCKET_NAME' already exists. Skipping setup."
+                else
+                    echo "Creating S3 bucket: $BUCKET_NAME"
+                    aws s3 mb s3://$BUCKET_NAME --region $REGION
+
+                echo "Disabling Block Public Access..."
+                    aws s3api put-public-access-block --bucket $BUCKET_NAME --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+                    
+                    echo "Creating and applying public read policy..."
+
+                cat <<EOF > policy.json
+{
+   "Version": "2012-10-17",
+   "Statement": [
+        {
+           "Sid": "PublicReadGetObject",
+           "Effect": "Allow",
+           "Principal": "*",
+           "Action": "s3:GetObject",
+           "Resource": "arn:aws:s3:::$BUCKET_NAME/*"
+        }
+    ]
+}
+EOF
+                aws s3api put-bucket-policy --bucket $BUCKET_NAME --policy file://policy.json
+                    rm -f policy.json
+                    
+                    echo "Enabling Static Website Hosting..."
+                    aws s3 website s3://$BUCKET_NAME/ --index-document index.html
+                fi
+                
+                # 3. Deploy the index.html file to S3 (This runs every single time)
+                echo "Uploading new index.html to S3..."
+                aws s3 cp index.html s3://$BUCKET_NAME/
+                
+                echo "=========================================================="
+                echo "Deployment complete!"
+                echo "Your live website URL is: http://$BUCKET_NAME.s3-website.$REGION.amazonaws.com/"
+                echo "=========================================================="
+
+                '''
+
+            }
+        }
+    }
+}

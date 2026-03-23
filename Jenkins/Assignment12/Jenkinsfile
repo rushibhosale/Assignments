@@ -1,0 +1,31 @@
+pipeline{
+
+    agent {label 'built-in'}
+
+    stages{
+        stage("Checkout code "){
+
+            steps{
+
+                echo "Pulling index.html from private GitHub repo (Branch: 2026Q1)..."
+                git branch: '2026Q1',
+                    credentialsId: 'ssh-key',
+                    url: 'https://github.com/rushibhosale/priv_repo.git'
+            }
+        }
+
+        stage("Deploy to apache httpd"){
+            steps{
+
+                sh '''
+                echo "Startingg deployment"
+                #!/bin/bash
+
+                cp index.html /var/www/html/
+                chmod 644 /var/www/html/index.html
+                sudo systemctl restart httpd
+                '''
+            }
+        }
+    }
+}

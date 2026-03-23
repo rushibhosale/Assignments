@@ -1,0 +1,39 @@
+pipeline{
+    agent {label 'built-in'}
+
+    parameters{
+        choice(
+            name: 'BRANCH_NAME',
+            choices: ['2026Q1', '2026Q2', '2026Q3'],
+            description: 'Select which quarter to deploy to the live Apache server'
+        )
+    }
+
+    stages{
+
+        stage("Checkout code"){
+            steps{
+                echo "Pulling index.html from branch: ${params.BRANCH_NAME}..."
+
+                git branch: "${params.BRANCH_NAME}",
+                credentialsId: 'ssh-key',
+                url: 'https://github.com/rushibhosale/priv_repo.git'
+
+            }
+        }
+
+        stage("Deploy to httpd"){
+            steps{
+
+                echo "Deploying ${params.BRANCH_NAME} to Apache..."
+                sh '''     
+                #!/bin/bash
+                sudo rm -f /var/www/html/index.html
+                sudo cp index.html /var/www/html/
+                sudo chmod 644 /var/www/html/index.html
+                sudo systemctl restart httpd
+                '''
+            }
+        }
+    }
+}

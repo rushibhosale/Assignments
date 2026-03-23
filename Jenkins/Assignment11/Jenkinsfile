@@ -1,0 +1,45 @@
+pipeline{
+
+    agent any
+
+    stages{
+        stage("Install and configure apache"){
+            steps{
+                echo "Starting deployment script.."
+
+                sh '''
+                #!/bin/bash
+                set -e
+
+                # 1. Install httpd server
+                yum install httpd -y
+
+                # 2. Start httpd
+                systemctl start httpd
+
+                # 3. Enable httpd
+                systemctl enable httpd
+                '''
+            }
+        }
+        stage("Deploy html and restart"){
+            steps{
+
+                sh '''
+                #!/bin/bash
+
+                # 1. Create index.html
+                echo "<h1>Hello from Jenkins Pipeline!</h1>" > index.html
+
+                # 2. Copy to html folder
+                cp index.html /var/www/html/
+                sudo chmod -R 777 /var/www/html/index.html
+
+                # 3. Restart httpd
+                systemctl restart httpd
+                '''
+            }
+
+        }
+    }
+}
