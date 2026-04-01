@@ -1,0 +1,66 @@
+pipeline{
+
+    agent {label 'built-in'}
+
+    environment{
+        REPO_URL = 'https://github.com/rushibhosale/priv_repo.git'
+    }
+
+    stages{
+        stage("Cleanup Old Containers"){
+            steps{
+                echo "Removing previous containers..."
+                sh 'docker rm -f container-branch1 container-branch2 container-branch3 || true'
+            }
+        }
+
+        stage('Deploy Branch 1 (Port 80)'){
+            steps{
+                dir('branch1_dir'){
+                echo "Checking out 2026Q1 branch"
+                git branch: '2026Q1',
+                url: "${REPO_URL}",
+                credentialsId: 'github-token'
+
+                sh '''
+                docker run -d --name container-branch1 -p 80:80 httpd
+                docker cp index.html container-branch1:/usr/local/apache2/htdocs/index.html
+                docker exec container-branch1 chmod 644 /usr/local/apache2/htdocs/index.html
+                '''
+                }
+            }
+        }
+
+        stage('Deploy Branch 2 (port 90)'){
+            steps{
+                dir('branch2-dir'){
+                    git branch: '2026Q2',
+                    url: "${REPO_URL}",
+                    credentialsId: 'github-token'
+
+                    sh '''
+                    docker run -d --name container-branch2 -p 90:80 httpd
+                    docker cp index.html container-branch2:/usr/local/apache2/htdocs/index.html
+                    docker exec container-branch2 chmod 644 /usr/local/apache2/htdocs/index.html
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy Branch 3 (port 8081)'){
+            steps{
+                dir('branch3-dir'){
+                    git branch: '2026Q3',
+                    url: "${REPO_URL}",
+                    credentialsId: 'github-token'
+
+                    sh '''
+                    docker run -d --name container-branch3 -p 8081:80 httpd
+                    docker cp index.html container-branch3:/usr/local/apache2/htdocs/index.html
+                    docker exec container-branch3 chmod 644 /usr/local/apache2/htdocs/index.html
+                    '''
+                }
+            }
+        }
+    }
+}
