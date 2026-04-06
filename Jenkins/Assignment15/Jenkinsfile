@@ -1,0 +1,59 @@
+pipeline {
+    agent { label 'built-in' }
+
+    stages {
+        stage('Code Checkout') {
+            steps {
+                git branch: 'master', 
+                url: 'https://github.com/Shantanumajan6/project.git'
+            }
+        }
+        
+        stage('Build, Publish, and Deploy') {
+            steps {
+                sh '''
+                #!/bin/bash
+                set -e
+                
+                TIMESTAMP=$(date +%Y%m%d%H%M%S)
+                BUCKET_NAME="my-tomcat-artifacts-repo-unique321" 
+                REGION="ap-south-1" 
+                PROJECT_NAME="loginwebapp"
+                S3_WAR_NAME="${PROJECT_NAME}-${TIMESTAMP}.war"
+                TOMCAT_WEBAPPS_DIR="/mnt/servers/apache-tomcat-10.1.54/webapps"
+                
+                echo "Starting build and deployment process..."
+                
+                if aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
+                    echo "S3 Bucket already exists. Skipping creation."
+                else
+                    echo "Creating new S3 bucket..."
+                    aws s3 mb s3://$BUCKET_NAME --region $REGION
+                fi
+                
+                export MAVEN_OPTS="--add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.text=ALL-UNNAMED --add-opens java.desktop/java.awt.font=ALL-UNNAMED"
+                
+                echo "Building with Maven..."
+                mvn clean package
+                
+                BUILT_WAR_FILE=$(ls target/*.war | head -n 1)
+                
+                echo "Uploading to S3..."
+                aws s3 cp $BUILT_WAR_FILE s3://${BUCKET_NAME}/${S3_WAR_NAME}
+                
+                echo "Downloading from S3..."
+                aws s3 cp s3://${BUCKET_NAME}/${S3_WAR_NAME} ./${S3_WAR_NAME}
+                
+                echo "Deploying to Tomcat..."
+                sudo cp ./${S3_WAR_NAME} ${TOMCAT_WEBAPPS_DIR}/${PROJECT_NAME}.war
+                
+                rm -f ./${S3_WAR_NAME}
+                
+                echo "=========================================================="
+                echo "Deployment successful!"
+                echo "=========================================================="
+                '''
+            }
+        }
+    }
+}
