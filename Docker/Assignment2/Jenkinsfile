@@ -1,0 +1,102 @@
+pipeline{
+    agent none
+
+    environment{
+        REPO_URL = 'https://github.com/rushibhosale/priv_repo.git'
+    }
+    stages{
+        stage('Distributed deployment..'){
+            parallel{
+                stage('Deploy to slave1'){
+                    agent {label 'slave1'}
+
+                    steps{
+                        echo "Starting cleanup on slave1"
+                        sh 'docker rm container-branch1 container-branch2 container-branch3 || true'
+
+                        dir('branch1_dir'){
+                            echo "Checking out 2026Q1 on Slave 1"
+                            git branch: '2026Q1',
+                                url: "${REPO_URL}",
+                                credentialsId: 'github-token'
+                                
+                            sh '''
+                            chmod 644 index.html
+                            docker run -d --name container-branch1 -p 80:80 -v "$PWD/index.html":/usr/local/apache2/htdocs/index.html httpd
+                            '''
+                        }
+
+                        dir('branch2_dir'){
+                            echo "Checking out 2026Q2 on Slave 1"
+                            git branch: '2026Q2',
+                                url: "${REPO_URL}",
+                                credentialsId: 'github-token'
+                                
+                            sh '''
+                            chmod 644 index.html
+                            docker run -d --name container-branch2 -p 90:80 -v "$PWD/index.html":/usr/local/apache2/htdocs/index.html httpd
+                            '''
+                        }
+
+                        dir('branch3_dir'){
+                            echo "Checking out 2026Q3 on Slave 1"
+                            git branch: '2026Q3',
+                                url: "${REPO_URL}",
+                                credentialsId: 'github-token'
+                                
+                            sh '''
+                            chmod 644 index.html
+                            docker run -d --name container-branch3 -p 8081:80 -v "$PWD/index.html":/usr/local/apache2/htdocs/index.html httpd
+                            '''
+                        }
+                    }
+                }
+
+                stage("Deploy on slave2"){
+                    agent {label 'slave2'}
+
+                    steps{
+                        echo "Starting cleanup on slave2"
+                        sh 'docker rm container-branch1 container-branch2 container-branch3 || true'
+
+                        dir('branch1_dir'){
+                            echo "Checking out 2026Q1 on Slave 2"
+                            git branch: '2026Q1',
+                                url: "${REPO_URL}",
+                                credentialsId: 'github-token'
+
+                            sh '''
+                            chmod 644 index.html
+                            docker run -d --name container-branch1 -p 80:80 -v "$PWD/index.html":/usr/local/apache2/htdocs/index.html httpd
+                            '''
+                        }
+
+                        dir('branch2_dir'){
+                            echo "Checking out 2026Q2 on Slave 2"
+                            git branch: '2026Q2',
+                                url: "${REPO_URL}",
+                                credentialsId: 'github-token'
+
+                            sh '''
+                            chmod 644 index.html
+                            docker run -d --name container-branch2 -p 90:80 -v "$PWD/index.html":/usr/local/apache2/htdocs/index.html httpd
+                            '''
+                        }
+
+                        dir('branch3_dir'){
+                            echo "Checking out 2026Q3 on Slave 2"
+                            git branch: '2026Q3',
+                                url: "${REPO_URL}",
+                                credentialsId: 'github-token'
+
+                            sh '''
+                            chmod 644 index.html
+                            docker run -d --name container-branch3 -p 8081:80 -v "$PWD/index.html":/usr/local/apache2/htdocs/index.html httpd
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
